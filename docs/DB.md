@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-30
 **Companion documents:** [PRD.md](PRD.md) (product), [Tech.md](Tech.md) (architecture)
-**Target:** Supabase Postgres, project `rrffjgmvwreldgrwlykp` — currently **empty** (0 tables, 0 migrations)
+**Target:** Supabase Postgres, project `rrffjgmvwreldgrwlykp` — **applied** 2026-07-30 (13 migrations, 7 tables, 1 view)
 
 ---
 
@@ -755,9 +755,18 @@ supabase/migrations/
   0010_stripe_events.sql            -- table, RLS (no policies)
   0011_invoice_vat_breakdown.sql    -- view, security_invoker
   0012_storage_invoices_bucket.sql  -- bucket + storage.objects policies
+  0013_function_grants.sql          -- close the RPC surface on our functions
 ```
 
-Applied in order via `apply_migration`, against a Supabase branch first.
+Applied in order via `apply_migration`.
+
+`0013` is the one addition made during migration. §6.2 revokes `next_invoice_number`
+from `PUBLIC`, but Supabase's default privileges grant `EXECUTE` on public-schema
+functions to `anon`, `authenticated` and `service_role` *explicitly*, and an explicit
+role grant is not removed by a revoke from `PUBLIC`. Without `0013` every function
+here — including the trigger functions — was reachable as `POST /rest/v1/rpc/<name>`,
+by anonymous callers too. Trigger functions need no `EXECUTE` grant to fire: Postgres
+checks that privilege when the trigger is *created*, not when it fires.
 
 TypeScript types are generated from the live schema after migrating and committed:
 
