@@ -26,9 +26,13 @@ export const updateSession = async (request: NextRequest) => {
 
   // Refreshing the auth token. Do not add code between `createServerClient` and
   // `getUser()` — a mistake here makes sessions randomly log out.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  // If you need to return a different response, copy the cookies over first:
+  // The caller gets the user alongside the response so route protection costs
+  // no extra round trip. If it returns a different response, it must copy the
+  // cookies over first:
   // myResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  return supabaseResponse;
+  return { response: supabaseResponse, user };
 };
