@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { RiBankCardLine } from "@remixicon/react";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { Placeholder } from "@/components/layout/placeholder";
 import { requireUser } from "@/lib/auth";
 
@@ -11,9 +12,10 @@ export default async function PaymentSettingsPage() {
 
   return (
     <>
-      <h1 className="font-heading text-2xl font-semibold tracking-tight">
-        Payments
-      </h1>
+      <PageHeader
+        title="Payments"
+        description="Connect your own Stripe account to collect payment on your invoices."
+      />
       <Placeholder
         icon={<RiBankCardLine />}
         title="Stripe not connected"

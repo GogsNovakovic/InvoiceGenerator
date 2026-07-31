@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
-import { RiGroupLine } from "@remixicon/react";
+import Link from "next/link";
+import { RiAddLine, RiGroupLine } from "@remixicon/react";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { Placeholder } from "@/components/layout/placeholder";
+import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Clients" };
@@ -11,9 +14,15 @@ export default async function ClientsPage() {
 
   return (
     <>
-      <h1 className="font-heading text-2xl font-semibold tracking-tight">
-        Clients
-      </h1>
+      <PageHeader
+        title="Clients"
+        actions={
+          <Button render={<Link href="/clients/new" />}>
+            <RiAddLine data-icon="inline-start" />
+            New client
+          </Button>
+        }
+      />
       <Placeholder
         icon={<RiGroupLine />}
         title="No clients yet"

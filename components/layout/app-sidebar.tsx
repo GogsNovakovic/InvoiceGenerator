@@ -2,19 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  RiBankCardLine,
-  RiDashboardLine,
-  RiFileList3Line,
-  RiGroupLine,
-  RiUserSettingsLine,
-} from "@remixicon/react";
+import { RiFileList3Line } from "@remixicon/react";
 
-import { NavUser } from "@/components/layout/nav-user";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -24,23 +16,17 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { SIDEBAR_SECTIONS, isActiveRoute, sidebarItems } from "@/lib/navigation";
 
-const mainNav = [
-  { title: "Dashboard", href: "/dashboard", icon: RiDashboardLine },
-  { title: "Invoices", href: "/invoices", icon: RiFileList3Line },
-  { title: "Clients", href: "/clients", icon: RiGroupLine },
-];
-
-const settingsNav = [
-  { title: "Profile", href: "/settings/profile", icon: RiUserSettingsLine },
-  { title: "Payments", href: "/settings/payments", icon: RiBankCardLine },
-];
-
-export function AppSidebar({ email }: { email: string }) {
+/**
+ * Destinations only. Identity and sign-out live in the header's <UserMenu>, so
+ * they stay reachable when this is collapsed to icons or closed on mobile.
+ *
+ * The entries come from lib/navigation.ts — add a screen there and it appears
+ * here and in the breadcrumbs at once.
+ */
+export function AppSidebar() {
   const pathname = usePathname();
-
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <Sidebar collapsible="icon">
@@ -62,49 +48,30 @@ export function AppSidebar({ email }: { email: string }) {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainNav.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    isActive={isActive(item.href)}
-                    tooltip={item.title}
-                    render={<Link href={item.href} />}
-                  >
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Settings</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {settingsNav.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    isActive={isActive(item.href)}
-                    tooltip={item.title}
-                    render={<Link href={item.href} />}
-                  >
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {SIDEBAR_SECTIONS.map((section) => (
+          <SidebarGroup key={section.id}>
+            {section.label && (
+              <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+            )}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {sidebarItems(section.id).map((item) => (
+                  <SidebarMenuItem key={item.pattern}>
+                    <SidebarMenuButton
+                      isActive={isActiveRoute(item.pattern, pathname)}
+                      tooltip={item.label}
+                      render={<Link href={item.pattern} />}
+                    >
+                      {item.icon && <item.icon />}
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
-
-      <SidebarFooter>
-        <NavUser email={email} />
-      </SidebarFooter>
 
       <SidebarRail />
     </Sidebar>

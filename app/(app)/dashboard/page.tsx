@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
-import { RiDashboardLine } from "@remixicon/react";
+import Link from "next/link";
+import { RiAddLine, RiDashboardLine } from "@remixicon/react";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { Placeholder } from "@/components/layout/placeholder";
+import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -11,14 +14,16 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-1">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
-          Dashboard
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Signed in as {user.email}.
-        </p>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description={`Signed in as ${user.email}.`}
+        actions={
+          <Button render={<Link href="/invoices/new" />}>
+            <RiAddLine data-icon="inline-start" />
+            New invoice
+          </Button>
+        }
+      />
       <Placeholder
         icon={<RiDashboardLine />}
         title="Nothing to show yet"
