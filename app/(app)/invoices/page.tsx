@@ -17,7 +17,7 @@ export default async function InvoicesPage() {
       <PageHeader
         title="Invoices"
         actions={
-          <Button render={<Link href="/invoices/new" />}>
+          <Button nativeButton={false} render={<Link href="/invoices/new" />}>
             <RiAddLine data-icon="inline-start" />
             New invoice
           </Button>

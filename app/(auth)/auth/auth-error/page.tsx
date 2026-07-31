@@ -34,8 +34,14 @@ export default async function AuthErrorPage(
         <CardDescription>{reasons[key] ?? reasons.expired}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <Button render={<Link href="/login" />}>Back to sign in</Button>
-        <Button variant="outline" render={<Link href="/forgot-password" />}>
+        <Button nativeButton={false} render={<Link href="/login" />}>
+          Back to sign in
+        </Button>
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link href="/forgot-password" />}
+        >
           Request a new link
         </Button>
       </CardContent>

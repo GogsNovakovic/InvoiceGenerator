@@ -17,7 +17,7 @@ export default async function ClientsPage() {
       <PageHeader
         title="Clients"
         actions={
-          <Button render={<Link href="/clients/new" />}>
+          <Button nativeButton={false} render={<Link href="/clients/new" />}>
             <RiAddLine data-icon="inline-start" />
             New client
           </Button>

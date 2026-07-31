@@ -18,7 +18,7 @@ export default async function DashboardPage() {
         title="Dashboard"
         description={`Signed in as ${user.email}.`}
         actions={
-          <Button render={<Link href="/invoices/new" />}>
+          <Button nativeButton={false} render={<Link href="/invoices/new" />}>
             <RiAddLine data-icon="inline-start" />
             New invoice
           </Button>

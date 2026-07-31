@@ -67,6 +67,10 @@ export function UserMenu({ email }: { email: string }) {
           <DropdownMenuItem
             variant="destructive"
             className="w-full"
+            // Menu items default to a non-button element, so Base UI would
+            // otherwise add synthetic keyboard handling on top of a real
+            // <button> that already has it.
+            nativeButton
             render={<button type="submit" />}
           >
             <RiLogoutBoxRLine />
