@@ -60,16 +60,23 @@ function DropdownMenuLabel({
 }: MenuPrimitive.GroupLabel.Props & {
   inset?: boolean
 }) {
+  // Menu.GroupLabel throws ("MenuGroupContext is missing") unless it has a
+  // Menu.Group ancestor, but a standalone label (e.g. an account name at the
+  // top of a menu) is a normal use of DropdownMenuLabel with no group around
+  // it. Wrapping here makes that the working default instead of a trap that
+  // only breaks once the menu is actually opened.
   return (
-    <MenuPrimitive.GroupLabel
-      data-slot="dropdown-menu-label"
-      data-inset={inset}
-      className={cn(
-        "px-3 py-2.5 text-xs text-muted-foreground data-inset:pl-9.5",
-        className
-      )}
-      {...props}
-    />
+    <MenuPrimitive.Group>
+      <MenuPrimitive.GroupLabel
+        data-slot="dropdown-menu-label"
+        data-inset={inset}
+        className={cn(
+          "px-3 py-2.5 text-xs text-muted-foreground data-inset:pl-9.5",
+          className
+        )}
+        {...props}
+      />
+    </MenuPrimitive.Group>
   )
 }
 
