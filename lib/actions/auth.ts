@@ -12,6 +12,7 @@ import {
   signInSchema,
   signUpSchema,
 } from "@/lib/validation/auth";
+import { isSupabaseAuthCookie } from "@/utils/supabase/auth-cookies";
 import { createClient } from "@/utils/supabase/server";
 
 /**
@@ -173,8 +174,26 @@ export async function updatePassword(input: unknown): Promise<ActionResult> {
 }
 
 export async function signOut() {
-  const supabase = createClient(await cookies());
-  await supabase.auth.signOut();
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
 
+  const { error } = await supabase.auth.signOut();
+
+  // When the stored session is already dead, `_signOut` bails out before
+  // `removeCurrentSession()` runs, leaving the PKCE verifier behind. Clearing
+  // the set here covers that, and every chunk, whether or not the call worked.
+  for (const { name } of cookieStore.getAll()) {
+    if (isSupabaseAuthCookie(name)) {
+      cookieStore.set(name, "", { path: "/", maxAge: 0 });
+    }
+  }
+
+  if (error) {
+    // Never a reason to keep someone on the page — the cookies are gone, so the
+    // session is over locally either way. Worth seeing in the log, though.
+    console.error("Sign-out failed server-side:", error.message);
+  }
+
+  // Must stay outside any try/catch: redirect() works by throwing NEXT_REDIRECT.
   redirect("/login");
 }
