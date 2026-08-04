@@ -28,8 +28,24 @@ function invalid(message: string) {
   return { ok: false as const, message };
 }
 
-function firstIssue(error: { issues: { message: string }[] }) {
-  return error.issues[0]?.message ?? "Check the form and try again.";
+/**
+ * Only messages this codebase authored reach the user; a `custom` issue is one
+ * of ours. Anything else is a form/schema shape mismatch — a bug — so it is
+ * logged rather than shown as if the user could act on it.
+ */
+function firstIssue(
+  error: { issues: { code: string; message: string; path: PropertyKey[] }[] },
+  context: string,
+) {
+  const authored = error.issues.find((issue) => issue.code === "custom");
+
+  if (authored) {
+    return authored.message;
+  }
+
+  console.error(`${context}: unexpected validation issues`, error.issues);
+
+  return "Check the form and try again.";
 }
 
 export async function createClientAction(
@@ -38,7 +54,7 @@ export async function createClientAction(
   const parsed = clientSchema.safeParse(input);
 
   if (!parsed.success) {
-    return invalid(firstIssue(parsed.error));
+    return invalid(firstIssue(parsed.error, "createClientAction"));
   }
 
   const user = await requireUser();
@@ -76,7 +92,7 @@ export async function updateClientAction(
   const parsed = clientSchema.safeParse(input);
 
   if (!parsed.success) {
-    return invalid(firstIssue(parsed.error));
+    return invalid(firstIssue(parsed.error, "updateClientAction"));
   }
 
   const user = await requireUser();

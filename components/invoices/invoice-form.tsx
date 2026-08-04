@@ -48,7 +48,6 @@ import { formatCentsPlain, formatPercent } from "@/lib/money";
 import {
   invoiceSchema,
   type InvoiceFormValues,
-  type InvoiceInput,
   type LineItemFormValues,
 } from "@/lib/validation/invoice";
 
@@ -90,8 +89,13 @@ export function InvoiceForm({
 
   const today = todayISO();
 
-  const form = useForm<InvoiceFormValues, unknown, InvoiceInput>({
-    resolver: zodResolver(invoiceSchema),
+  // `raw: true` keeps the untransformed string fields. Without it the resolver
+  // hands `handleSubmit` the schema's *output* — cents, basis points, renamed
+  // keys — and the action, which validates the same schema again, would be
+  // parsing its own output and reject every save (docs/Tech.md §4.5: the client
+  // sends the change, the server does the authoritative transform).
+  const form = useForm<InvoiceFormValues>({
+    resolver: zodResolver(invoiceSchema, undefined, { raw: true }),
     defaultValues: invoice?.values ?? {
       client_id: "",
       invoice_date: today,
@@ -122,7 +126,7 @@ export function InvoiceForm({
     router.push(`/invoices/${invoiceId}`);
   }
 
-  async function onSubmit(values: InvoiceInput) {
+  async function onSubmit(values: InvoiceFormValues) {
     setFormError(null);
 
     const result = invoice

@@ -44,8 +44,26 @@ function invalid(message: string) {
   return { ok: false as const, message };
 }
 
-function firstIssue(error: { issues: { message: string }[] }) {
-  return error.issues[0]?.message ?? "Check the form and try again.";
+/**
+ * Only messages this codebase authored reach the user. A `custom` issue is one
+ * of ours — "Enter a valid date.", "Quantity must be above zero." — and says
+ * something actionable. Anything else is a shape mismatch between the form and
+ * the schema, which is a bug rather than user error, so it goes to the server
+ * log instead of being dressed up as advice.
+ */
+function firstIssue(
+  error: { issues: { code: string; message: string; path: PropertyKey[] }[] },
+  context: string,
+) {
+  const authored = error.issues.find((issue) => issue.code === "custom");
+
+  if (authored) {
+    return authored.message;
+  }
+
+  console.error(`${context}: unexpected validation issues`, error.issues);
+
+  return "Check the form and try again.";
 }
 
 /** Line items are always rewritten wholesale — see docs/DB.md §7 on editing. */
@@ -72,7 +90,7 @@ export async function createInvoiceAction(
   const parsed = invoiceSchema.safeParse(input);
 
   if (!parsed.success) {
-    return invalid(firstIssue(parsed.error));
+    return invalid(firstIssue(parsed.error, "createInvoiceAction"));
   }
 
   const user = await requireUser();
@@ -178,7 +196,7 @@ export async function updateInvoiceAction(
   const parsed = invoiceSchema.safeParse(input);
 
   if (!parsed.success) {
-    return invalid(firstIssue(parsed.error));
+    return invalid(firstIssue(parsed.error, "updateInvoiceAction"));
   }
 
   const user = await requireUser();

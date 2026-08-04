@@ -8,11 +8,7 @@ import { toast } from "sonner";
 
 import { createClientAction, updateClientAction } from "@/lib/actions/clients";
 import type { ClientOption, ClientRecord } from "@/lib/data/clients";
-import {
-  clientSchema,
-  type ClientFormValues,
-  type ClientInput,
-} from "@/lib/validation/client";
+import { clientSchema, type ClientFormValues } from "@/lib/validation/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,10 +34,12 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Third type argument is the schema's *output*: every field is transformed
-  // (blanks become null), so it differs from what the inputs collect.
-  const form = useForm<ClientFormValues, unknown, ClientInput>({
-    resolver: zodResolver(clientSchema),
+  // `raw: true` keeps the fields as the inputs collect them. The resolver would
+  // otherwise hand `handleSubmit` the schema's *output*, where a blank field has
+  // already become `null` — and the action, which validates the same schema
+  // again, rejects `null` where it expects an optional string.
+  const form = useForm<ClientFormValues>({
+    resolver: zodResolver(clientSchema, undefined, { raw: true }),
     defaultValues: {
       full_name: client?.full_name ?? "",
       company_name: client?.company_name ?? "",
@@ -51,7 +49,7 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
     },
   });
 
-  async function onSubmit(values: ClientInput) {
+  async function onSubmit(values: ClientFormValues) {
     setFormError(null);
 
     if (client) {

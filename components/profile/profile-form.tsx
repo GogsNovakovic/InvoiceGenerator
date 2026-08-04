@@ -8,11 +8,7 @@ import { toast } from "sonner";
 import { updateProfileAction } from "@/lib/actions/profile";
 import { CURRENCIES } from "@/lib/currency";
 import type { ProfileRecord } from "@/lib/data/profile";
-import {
-  profileSchema,
-  type ProfileFormValues,
-  type ProfileInput,
-} from "@/lib/validation/profile";
+import { profileSchema, type ProfileFormValues } from "@/lib/validation/profile";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,8 +34,11 @@ import { Textarea } from "@/components/ui/textarea";
 export function ProfileForm({ profile }: { profile: ProfileRecord }) {
   const [formError, setFormError] = useState<string | null>(null);
 
-  const form = useForm<ProfileFormValues, unknown, ProfileInput>({
-    resolver: zodResolver(profileSchema),
+  // `raw: true` — see the note in client-form.tsx: the action validates this
+  // same schema again, so it has to receive the raw fields rather than the
+  // resolver's already-transformed output.
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema, undefined, { raw: true }),
     defaultValues: {
       full_name: profile.full_name ?? "",
       company_name: profile.company_name ?? "",
@@ -51,7 +50,7 @@ export function ProfileForm({ profile }: { profile: ProfileRecord }) {
     },
   });
 
-  async function onSubmit(values: ProfileInput) {
+  async function onSubmit(values: ProfileFormValues) {
     setFormError(null);
 
     const result = await updateProfileAction(values);

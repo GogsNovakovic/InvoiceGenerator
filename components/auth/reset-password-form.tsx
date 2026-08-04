@@ -1,19 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { updatePassword } from "@/lib/actions/auth";
 import {
+  passwordRules,
   resetPasswordSchema,
   type ResetPasswordInput,
 } from "@/lib/validation/auth";
+import { PasswordRequirements } from "@/components/auth/password-requirements";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -40,7 +41,15 @@ export function ResetPasswordForm() {
     }
   }
 
-  const { errors, isSubmitting } = form.formState;
+  // Drives the live checklist.
+  const passwordValue = useWatch({ control: form.control, name: "password" });
+
+  const { errors, isSubmitted, isSubmitting } = form.formState;
+
+  // See register-form.tsx — the checklist already states every rule it covers.
+  const passwordErrorIsCovered = passwordRules.some(
+    (rule) => rule.error === errors.password?.message,
+  );
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
@@ -59,12 +68,17 @@ export function ResetPasswordForm() {
             autoComplete="new-password"
             autoFocus
             aria-invalid={Boolean(errors.password)}
+            aria-describedby="password-requirements"
             {...form.register("password")}
           />
-          <FieldDescription>
-            At least 8 characters, including a letter and a number.
-          </FieldDescription>
-          <FieldError errors={[errors.password]} />
+          <PasswordRequirements
+            id="password-requirements"
+            value={passwordValue ?? ""}
+            showErrors={isSubmitted}
+          />
+          {errors.password && !passwordErrorIsCovered && (
+            <FieldError errors={[errors.password]} />
+          )}
         </Field>
 
         <Field data-invalid={Boolean(errors.confirmPassword)}>

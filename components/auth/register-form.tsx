@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RiMailCheckLine } from "@remixicon/react";
 
 import { resendConfirmation, signUp } from "@/lib/actions/auth";
-import { signUpSchema, type SignUpInput } from "@/lib/validation/auth";
+import {
+  passwordRules,
+  signUpSchema,
+  type SignUpInput,
+} from "@/lib/validation/auth";
+import { PasswordRequirements } from "@/components/auth/password-requirements";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +43,10 @@ export function RegisterForm() {
     resolver: zodResolver(signUpSchema),
     defaultValues: { email: "", password: "" },
   });
+
+  // Drives the live checklist. Must stay above the early return below, since
+  // hooks cannot run conditionally.
+  const passwordValue = useWatch({ control: form.control, name: "password" });
 
   async function onSubmit(values: SignUpInput) {
     setFormError(null);
@@ -94,7 +103,14 @@ export function RegisterForm() {
     );
   }
 
-  const { errors, isSubmitting } = form.formState;
+  const { errors, isSubmitted, isSubmitting } = form.formState;
+
+  // Every checklist rule already renders its own state, so showing the matching
+  // zod message underneath would say the same thing twice. Only errors the
+  // checklist cannot express — in practice the 72-character ceiling — get here.
+  const passwordErrorIsCovered = passwordRules.some(
+    (rule) => rule.error === errors.password?.message,
+  );
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
@@ -125,12 +141,17 @@ export function RegisterForm() {
             type="password"
             autoComplete="new-password"
             aria-invalid={Boolean(errors.password)}
+            aria-describedby="password-requirements"
             {...form.register("password")}
           />
-          <FieldDescription>
-            At least 8 characters, including a letter and a number.
-          </FieldDescription>
-          <FieldError errors={[errors.password]} />
+          <PasswordRequirements
+            id="password-requirements"
+            value={passwordValue ?? ""}
+            showErrors={isSubmitted}
+          />
+          {errors.password && !passwordErrorIsCovered && (
+            <FieldError errors={[errors.password]} />
+          )}
         </Field>
 
         <Field>

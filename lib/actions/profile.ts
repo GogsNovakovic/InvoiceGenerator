@@ -17,9 +17,20 @@ export async function updateProfileAction(input: unknown): Promise<ActionResult>
   const parsed = profileSchema.safeParse(input);
 
   if (!parsed.success) {
+    // Only our own messages are shown; anything else is a form/schema shape
+    // mismatch, which is a bug and belongs in the log, not on the screen.
+    const authored = parsed.error.issues.find((issue) => issue.code === "custom");
+
+    if (!authored) {
+      console.error(
+        "updateProfileAction: unexpected validation issues",
+        parsed.error.issues,
+      );
+    }
+
     return {
       ok: false,
-      message: parsed.error.issues[0]?.message ?? "Check the form and try again.",
+      message: authored?.message ?? "Check the form and try again.",
     };
   }
 

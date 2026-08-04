@@ -13,16 +13,54 @@ const email = z
   .transform((value) => value.toLowerCase());
 
 /**
- * Minimum 8 characters with at least one letter and one digit. The Supabase
- * project's own minimum must be raised to 8 as well, otherwise the database
- * accepts weaker passwords set through any other path.
+ * The password rules, as data rather than as chained zod checks, so the schema
+ * below and the live checklist the user sees while typing
+ * (components/auth/password-requirements.tsx) are built from one list and
+ * cannot drift apart.
+ *
+ * The Supabase project's own minimum must be raised to 8 as well, otherwise the
+ * database accepts weaker passwords set through any other path.
  */
-const password = z
-  .string()
-  .min(8, { error: "Use at least 8 characters." })
-  .max(72, { error: "Use at most 72 characters." })
-  .regex(/[a-zA-Z]/, { error: "Include at least one letter." })
-  .regex(/[0-9]/, { error: "Include at least one number." });
+export const passwordRules = [
+  {
+    id: "length",
+    label: "At least 8 characters",
+    test: (value: string) => value.length >= 8,
+    error: "Use at least 8 characters.",
+  },
+  {
+    id: "letter",
+    label: "A letter (a–z)",
+    test: (value: string) => /[a-zA-Z]/.test(value),
+    error: "Include at least one letter.",
+  },
+  {
+    id: "number",
+    label: "A number (0–9)",
+    test: (value: string) => /[0-9]/.test(value),
+    error: "Include at least one number.",
+  },
+  {
+    // Anything non-alphanumeric, deliberately: an allowlist such as [!@#$%^&*]
+    // would reject "£" and every other non-ASCII symbol. A space counts too.
+    id: "special",
+    label: "A special character (! ? @ £ #)",
+    test: (value: string) => /[^A-Za-z0-9]/.test(value),
+    error: "Include at least one special character.",
+  },
+] as const;
+
+/**
+ * `.refine()` chains stop at the first failure, so only one message ever
+ * reaches the server action — which reads `issues[0]` anyway. The checklist is
+ * what shows all four states at once.
+ */
+// Both generics are pinned: z.ZodType defaults its Input to `unknown`, which
+// would make every field holding this schema infer `password: unknown`.
+const password = passwordRules.reduce<z.ZodType<string, string>>(
+  (schema, rule) => schema.refine(rule.test, { error: rule.error }),
+  z.string().max(72, { error: "Use at most 72 characters." }),
+);
 
 export const signInSchema = z.object({
   email,

@@ -11,7 +11,7 @@ import { RiAddLine, RiCloseLine, RiDeleteBinLine } from "@remixicon/react";
 import type { Currency } from "@/lib/currency";
 import { lineSubtotalCents, parseFormLine } from "@/lib/invoice-totals";
 import { formatCentsPlain } from "@/lib/money";
-import type { InvoiceFormValues, InvoiceInput } from "@/lib/validation/invoice";
+import type { InvoiceFormValues } from "@/lib/validation/invoice";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -47,7 +47,7 @@ export function LineItemsEditor({
   form,
   currency,
 }: {
-  form: UseFormReturn<InvoiceFormValues, unknown, InvoiceInput>;
+  form: UseFormReturn<InvoiceFormValues>;
   currency: Currency;
 }) {
   const { fields, append, remove } = useFieldArray({
