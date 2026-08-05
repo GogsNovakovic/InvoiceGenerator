@@ -15,6 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { SIDEBAR_SECTIONS, isActiveRoute, sidebarItems } from "@/lib/navigation";
 
@@ -27,13 +28,28 @@ import { SIDEBAR_SECTIONS, isActiveRoute, sidebarItems } from "@/lib/navigation"
  */
 export function AppSidebar() {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  /**
+   * Below `md` this whole sidebar is a Sheet laid over the page. Following a
+   * link inside it navigates underneath but leaves the sheet open, so the new
+   * page is hidden behind it until the user dismisses it by hand.
+   */
+  const closeOnNavigate = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
+            <SidebarMenuButton
+              size="lg"
+              render={<Link href="/dashboard" onClick={closeOnNavigate} />}
+            >
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <RiFileList3Line className="size-4" />
               </div>
@@ -60,7 +76,9 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       isActive={isActiveRoute(item.pattern, pathname)}
                       tooltip={item.label}
-                      render={<Link href={item.pattern} />}
+                      render={
+                        <Link href={item.pattern} onClick={closeOnNavigate} />
+                      }
                     >
                       {item.icon && <item.icon />}
                       <span>{item.label}</span>
