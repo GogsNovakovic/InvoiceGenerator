@@ -32,7 +32,7 @@ Verified against `package.json`, `components.json`, and the working tree.
 ```
 next 16.2.12            react 19.2.4            react-dom 19.2.4
 @supabase/ssr 0.12.3    @supabase/supabase-js 2.110.8
-resend 6.18.1
+resend 6.18.1           stripe 22.4.0
 @base-ui/react 1.6.0    @remixicon/react 4.9.0
 class-variance-authority 0.7.1   clsx 2.1.1   tailwind-merge 3.6.0   tw-animate-css 1.4.0
 ```
@@ -63,15 +63,13 @@ class-variance-authority 0.7.1   clsx 2.1.1   tailwind-merge 3.6.0   tw-animate-
 
 ---
 
-## 3. What still needs installing
+## 3. Packages added during the build
 
-```bash
-npm install stripe @react-pdf/renderer zod react-hook-form @hookform/resolvers
-```
+All installed:
 
 | Package | Why |
 |---|---|
-| `stripe` | Server-side Stripe SDK — Connect accounts, Payment Links, webhook signature verification |
+| `stripe` (22.4.0) | Server-side Stripe SDK — Connect accounts, Payment Links, webhook signature verification |
 | `@react-pdf/renderer` | Server-side PDF generation, no headless browser required |
 | `zod` | One schema per form, reused for client feedback and as the server-side gate |
 | `react-hook-form` + `@hookform/resolvers` | Required by the shadcn `form` component; drives the dynamic line-item editor |
@@ -292,8 +290,19 @@ Editing an invoice repeats the same steps and overwrites the object.
 
 Onboarding:
 
-1. `stripe.accounts.create({ type: 'express', … })` → store `acct_…` on the profile
-2. `stripe.accountLinks.create({ account, refresh_url, return_url, type: 'account_onboarding' })` → redirect the user to Stripe
+1. `stripe.accounts.create({ controller: … })` → store `acct_…` on the profile.
+   `type: 'express'` is **deprecated** in the current API, so the Express preset
+   is spelled out through `controller` instead — `stripe_dashboard.type: 'express'`,
+   `fees.payer: 'application'`, `losses.payments: 'application'`,
+   `requirement_collection: 'stripe'` — plus `card_payments` and `transfers`
+   requested as capabilities. Same behaviour, non-deprecated parameter.
+   **Note the fee model this implies:** with the Express preset the *platform*
+   carries Stripe's processing fees and any negative balances, while §11.1 of
+   the PRD takes no application fee to offset them.
+2. `stripe.accountLinks.create({ account, refresh_url, return_url, type })` → redirect the user to Stripe.
+   `account_onboarding` while the account is unfinished, `account_update` once it
+   accepts charges, so the "Update details" button does not drop a live account
+   back into onboarding.
 3. Stripe returns the user to `/api/stripe/connect/return`, which re-reads the account and caches `charges_enabled` and `details_submitted` on the profile
 4. `account.updated` webhooks keep those flags current afterwards
 
@@ -326,6 +335,8 @@ const link = await stripe.paymentLinks.create(
 
 `metadata.invoice_id` is what the webhook keys on. The one-off price makes the amount immutable, which matches the product decision that a link is created once and never revised.
 
+`ensureInvoicePaymentLink(userId, invoiceId)` is the single entry point, and it is idempotent: an invoice that already has a link gets that link back untouched. It runs when an invoice is created, and again on send — the second call is what gives a link to invoices that were created *before* the user connected Stripe, which otherwise could never have one. An unconnected account, an account not yet cleared for charges, or a zero total all return `{ ok: true, url: null }`: nothing to create, not a failure.
+
 Deleting an invoice calls `stripe.paymentLinks.update(id, { active: false }, { stripeAccount })` so a deleted invoice cannot still be paid.
 
 ### 9.3 Webhook
@@ -356,6 +367,13 @@ export async function POST(request: Request) {
    - **not equal** → leave the status alone; set `amount_received_cents` and `payment_mismatch = true`
 4. Return `200`. A non-2xx makes Stripe retry, which is correct only for genuine transient failures — a malformed or unknown event returns `200` with a logged warning so Stripe stops resending it.
 
+Two consequences of putting the idempotency gate first:
+
+- A transient failure *after* the gate row exists must **delete that row** before returning non-2xx. Otherwise Stripe's retry is waved through as a duplicate and the payment is never applied.
+- `/api/stripe/webhook` is listed in `PUBLIC_ROUTES` in [proxy.ts](../proxy.ts). Stripe posts with no cookies, and the optimistic redirect would otherwise answer every delivery with a 307 to `/login`. The signature is the authentication on this route.
+
+`checkout.session.completed` also arrives for asynchronous payment methods that have not settled, so a session whose `payment_status` is not `paid` is recorded and left alone. The amount comparison covers currency as well as value — the same integer in a different currency is a mismatch, not a match.
+
 The webhook runs with the **service-role** Supabase client (`lib/supabase/admin.ts`) because there is no user session on the request. That client is used *only* here, and only on the resolved invoice id.
 
 `stripe_confirmed_paid` is the flag that permanently locks the invoice against edit and delete, independent of the freely-toggleable `status`.
@@ -382,6 +400,8 @@ Changes required to that module:
 - `replyTo` set to the freelancer's profile email, so client replies reach the freelancer rather than the platform
 - the existing `escapeHtml` helper kept and applied to every interpolated value; it is doing real work
 
+Sending is gated on `stripe_charges_enabled`, per PRD §11.1: the email exists to carry the payment link, so until Stripe can take charges the Send button is disabled with *"Connect Stripe to collect payment"* and the action refuses the same way. The practical consequence is worth stating plainly — **a user who never connects Stripe can never email an invoice**, only download its PDF.
+
 Sending happens in `lib/actions/send.ts` — a Server Action with a `requireUser()` check — not in an open route handler. Each attempt writes an `invoice_sends` row with the Resend message id or the error, and a successful first send sets `sent_at` on the invoice. Resend returns `{ data: null, error }` instead of throwing, which the existing client already handles correctly.
 
 `RESEND_FROM` must move off `onboarding@resend.dev` to an address on the verified domain; in test mode that default only delivers to the account owner's own address.
@@ -399,14 +419,23 @@ RESEND_API_KEY
 RESEND_FROM                       # currently onboarding@resend.dev — must change
 ```
 
+Added since:
+
+```
+NEXT_PUBLIC_APP_URL               # absolute URLs for Stripe return links and email
+SUPABASE_SERVICE_ROLE_KEY         # webhook only, never imported into client code
+STRIPE_SECRET_KEY
+```
+
 Still to add:
 
 ```
-SUPABASE_SERVICE_ROLE_KEY         # webhook only, never imported into client code
-STRIPE_SECRET_KEY
-STRIPE_WEBHOOK_SECRET
-NEXT_PUBLIC_APP_URL               # absolute URLs for Stripe return links and email
+STRIPE_WEBHOOK_SECRET             # `stripe listen` locally; the endpoint's own secret in production
 ```
+
+This project uses Supabase's current API keys, so `SUPABASE_SERVICE_ROLE_KEY` holds an `sb_secret_…` key rather than a legacy `service_role` JWT. Same privileges, same rule: server-only, one importing module.
+
+Without `STRIPE_WEBHOOK_SECRET` the webhook route answers `500 Webhook not configured` and nothing is processed. Everything else — onboarding, payment links, email — works without it.
 
 Anything without the `NEXT_PUBLIC_` prefix stays server-only. `SUPABASE_SERVICE_ROLE_KEY` and `STRIPE_SECRET_KEY` are reachable from exactly one module each (`lib/supabase/admin.ts`, `lib/stripe/client.ts`), both server-only, so an accidental client import fails the build rather than shipping a key.
 

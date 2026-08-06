@@ -13,6 +13,10 @@ import {
 import { getProfile } from "@/lib/data/profile";
 import { generateInvoicePdf, removeInvoicePdf } from "@/lib/pdf/store";
 import {
+  deactivateInvoicePaymentLink,
+  ensureInvoicePaymentLink,
+} from "@/lib/stripe/payment-links";
+import {
   invoiceIdSchema,
   invoiceSchema,
   invoiceStatusSchema,
@@ -35,6 +39,8 @@ export type SaveInvoiceResult =
       invoiceId: string;
       /** Set when the invoice saved but its PDF did not (docs/PRD.md §8). */
       pdfWarning?: string;
+      /** Set when the invoice saved but its payment link could not be created. */
+      paymentLinkWarning?: string;
       /** True when the invoice had already been emailed, so the UI can offer a resend. */
       wasSent?: boolean;
     }
@@ -174,12 +180,19 @@ export async function createInvoiceAction(
 
   const pdf = await generateInvoicePdf(user.id, invoice.id);
 
+  // The link is created here, once, for the total the trigger just computed
+  // (docs/PRD.md §11.2). Like the PDF, a failure is reported rather than
+  // thrown: an invoice number has already been spent, and a Stripe outage must
+  // not cost the user the invoice.
+  const link = await ensureInvoicePaymentLink(user.id, invoice.id);
+
   refresh();
 
   return {
     ok: true,
     invoiceId: invoice.id,
     pdfWarning: pdf.ok ? undefined : pdf.message,
+    paymentLinkWarning: link.ok ? undefined : link.message,
   };
 }
 
@@ -308,6 +321,22 @@ export async function deleteInvoiceAction(
         ? "This invoice was paid through Stripe and cannot be deleted."
         : "Mark this invoice as not paid before deleting it.",
     );
+  }
+
+  // Deactivated *before* the row goes, so a Stripe failure leaves a live link
+  // attached to an invoice that still exists rather than one that does not.
+  // Nobody may pay a deleted invoice (docs/PRD.md §13).
+  if (existing.stripe_payment_link_id) {
+    const deactivated = await deactivateInvoicePaymentLink(
+      user.id,
+      existing.stripe_payment_link_id,
+    );
+
+    if (!deactivated.ok) {
+      return invalid(
+        `The payment link could not be deactivated, so the invoice was kept. ${deactivated.message}`,
+      );
+    }
   }
 
   const supabase = createClient(await cookies());

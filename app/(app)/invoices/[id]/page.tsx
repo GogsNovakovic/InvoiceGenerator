@@ -5,6 +5,7 @@ import {
   RiAlertLine,
   RiDownloadLine,
   RiEditLine,
+  RiExternalLinkLine,
   RiFilePdf2Line,
 } from "@remixicon/react";
 
@@ -37,6 +38,7 @@ import {
   getInvoiceDetail,
   isOverdue,
 } from "@/lib/data/invoices";
+import { getStripeAccount } from "@/lib/data/profile";
 import { formatDate } from "@/lib/dates";
 import { toInvoiceView } from "@/lib/invoice-view";
 import { formatCents } from "@/lib/money";
@@ -56,7 +58,10 @@ export default async function InvoiceDetailPage({
 }: PageProps<"/invoices/[id]">) {
   const { id } = await params;
   const user = await requireUser();
-  const detail = await getInvoiceDetail(user.id, id);
+  const [detail, stripeAccount] = await Promise.all([
+    getInvoiceDetail(user.id, id),
+    getStripeAccount(user.id),
+  ]);
 
   if (!detail) {
     notFound();
@@ -83,6 +88,7 @@ export default async function InvoiceDetailPage({
               clientEmail={invoice.client_email}
               hasPdf={hasPdf}
               alreadySent={invoice.sent_at !== null}
+              stripeReady={stripeAccount.chargesEnabled}
             />
 
             {hasPdf ? (
@@ -176,6 +182,40 @@ export default async function InvoiceDetailPage({
         />
         <InvoiceStatusControl invoiceId={invoice.id} status={invoice.status} />
       </div>
+
+      {/* Created once, for the total at the time (docs/PRD.md §11.2), and shown
+          here as well as in the email so the user can send it any other way. */}
+      {invoice.stripe_payment_link_url && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment link</CardTitle>
+            <CardDescription>
+              Your client can pay this invoice with a card here. The link keeps
+              the amount it was created with, and paying it marks the invoice as
+              paid.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-3">
+            <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-3 py-2 text-xs">
+              {invoice.stripe_payment_link_url}
+            </code>
+            <Button
+              variant="outline"
+              nativeButton={false}
+              render={
+                <a
+                  href={invoice.stripe_payment_link_url}
+                  target="_blank"
+                  rel="noreferrer"
+                />
+              }
+            >
+              <RiExternalLinkLine data-icon="inline-start" />
+              Open
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <InvoicePreview invoice={view} />
 

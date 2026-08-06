@@ -5,11 +5,12 @@ import { cookies } from "next/headers";
 
 import { requireUser } from "@/lib/auth";
 import { getInvoiceById } from "@/lib/data/invoices";
-import { getProfile } from "@/lib/data/profile";
+import { getProfile, getStripeAccount } from "@/lib/data/profile";
 import { formatDate } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
 import { invoicePdfFilename } from "@/lib/pdf/render";
 import { downloadInvoicePdf } from "@/lib/pdf/store";
+import { ensureInvoicePaymentLink } from "@/lib/stripe/payment-links";
 import { invoiceIdSchema, sendNoteSchema } from "@/lib/validation/invoice";
 import { createClient } from "@/utils/supabase/server";
 import { sendInvoiceEmail } from "@/utils/resend/send-invoice";
@@ -66,6 +67,24 @@ export async function sendInvoiceAction(
     return invalid("Generate the PDF before sending this invoice.");
   }
 
+  // Sending and collecting payment are one action in this product: until Stripe
+  // is connected there is nothing to put in the email but the PDF, so the send
+  // is refused rather than half-done (docs/PRD.md §11.1).
+  const account = await getStripeAccount(user.id);
+
+  if (!account.chargesEnabled) {
+    return invalid("Connect Stripe to collect payment.");
+  }
+
+  // Creates the link only if this invoice has none — an invoice that predates
+  // the Stripe connection would otherwise never get one, because links are made
+  // at creation time. An existing link is returned untouched (docs/PRD.md §11.3).
+  const link = await ensureInvoicePaymentLink(user.id, invoice.id);
+
+  if (!link.ok) {
+    return invalid(`The payment link could not be created. ${link.message}`);
+  }
+
   const pdf = await downloadInvoicePdf(invoice.pdf_path);
 
   if (!pdf) {
@@ -95,8 +114,7 @@ export async function sendInvoiceAction(
     senderName,
     clientName: invoice.client_full_name ?? invoice.client_company_name,
     note: parsedNote.data,
-    // Stripe is not wired yet, so there is no link to include (docs/PRD.md §12).
-    paymentLinkUrl: null,
+    paymentLinkUrl: link.url,
     pdf: {
       filename: invoicePdfFilename(invoice.invoice_number),
       content: pdf,

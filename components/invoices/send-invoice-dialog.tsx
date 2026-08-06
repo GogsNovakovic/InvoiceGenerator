@@ -25,20 +25,24 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
  * optional note. The PDF is attached and Reply-To is the freelancer's own
  * address (docs/PRD.md §12).
  *
- * Two reasons the button is disabled, each with the tooltip that explains it:
- * a client with no email address, and an invoice whose PDF has not been
- * generated yet.
+ * Three reasons the button is disabled, each with the tooltip that explains it:
+ * a client with no email address, an invoice whose PDF has not been generated
+ * yet, and a Stripe account that cannot yet take charges — the email carries
+ * the payment link, so sending waits on the connection (docs/PRD.md §11.1).
+ * The action re-checks all three; a disabled button is not a security control.
  */
 export function SendInvoiceDialog({
   invoiceId,
   clientEmail,
   hasPdf,
   alreadySent,
+  stripeReady,
 }: {
   invoiceId: string;
   clientEmail: string | null;
   hasPdf: boolean;
   alreadySent: boolean;
+  stripeReady: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
@@ -48,7 +52,9 @@ export function SendInvoiceDialog({
     ? "This client has no email address."
     : !hasPdf
       ? "This invoice has no PDF yet. Regenerate it first."
-      : null;
+      : !stripeReady
+        ? "Connect Stripe to collect payment."
+        : null;
 
   async function onSend() {
     setIsSending(true);

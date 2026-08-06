@@ -146,6 +146,14 @@ export function InvoiceForm({
       toast.success(invoice ? "Invoice saved." : "Invoice created.");
     }
 
+    // Same idea for the payment link: the invoice stands, it simply has no link
+    // to pay it with (docs/PRD.md §11.2).
+    if (result.paymentLinkWarning) {
+      toast.warning(
+        `${result.paymentLinkWarning} The invoice was saved without a payment link.`,
+      );
+    }
+
     if (result.wasSent) {
       setResendFor(result.invoiceId);
       return;

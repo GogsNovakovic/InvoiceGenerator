@@ -14,6 +14,11 @@ const PUBLIC_ROUTES = [
   "/forgot-password",
   "/auth/confirm",
   "/auth/auth-error",
+  // Stripe posts here with no cookies. Redirecting it to /login would make
+  // every delivery fail; the route authenticates the Stripe signature instead
+  // of a session (docs/Tech.md §9.3). The Connect *return* URL is deliberately
+  // not listed — a real user comes back through that one.
+  "/api/stripe/webhook",
 ];
 
 function isPublic(pathname: string) {
